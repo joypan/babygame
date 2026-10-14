@@ -226,34 +226,41 @@
   // ====== 音效：Web Audio 合成，不需音檔 ======
   let audioCtx = null;
   let musicGain = null;   // 背景音樂總音量，唸單字時壓低
-  function ensureAudio() {
-    // 行動瀏覽器要有使用者手勢後才允許建立/恢復 AudioContext，每次點擊都呼叫一次
-    if (!audioCtx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) {
-        audioCtx = new AC();
-        musicGain = audioCtx.createGain();
-        musicGain.gain.value = MUSIC_VOL;
-        musicGain.connect(audioCtx.destination);
-      }
-    }
-    if (audioCtx && audioCtx.state !== 'running') {
-      // iOS 切回前景後 state 會是 'interrupted'，也要 resume；resume 完補播一個空 buffer 是 iOS 解鎖的老招
-      audioCtx.resume().then(() => {
-        // 切背景回來 AudioContext 被中斷過，音樂排程要重新接上（這裡在使用者手勢內，手機才肯 resume）
-        if (musicWanted && musicOn && !musicTimer) startMusic();
-        if (unlocked) return;
-        unlocked = true;
-        const src = audioCtx.createBufferSource();
-        src.buffer = audioCtx.createBuffer(1, 1, 22050);
-        src.connect(audioCtx.destination);
-        src.start(0);
-      });
-    } else if (musicWanted && musicOn && !musicTimer) {
-      startMusic();
-    }
-  }
   let unlocked = false;
+  let ctxStale = false;   // resume 過但一直沒回到 running：這顆 AudioContext 已死，下次手勢換新的
+  function createCtx() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (audioCtx) { try { audioCtx.close(); } catch (e) { /* 已關 */ } }
+    audioCtx = new AC();
+    musicGain = audioCtx.createGain();
+    musicGain.gain.value = MUSIC_VOL;
+    musicGain.connect(audioCtx.destination);
+    unlocked = false; ctxStale = false; voiceSrc = null;
+    voiceCache.clear();   // 舊 context 上卡住的 decode 不會回來，重抓（瀏覽器快取，很快）
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }   // 排程綁舊 context，要重開
+  }
+  function onAudioRunning() {
+    if (musicWanted && musicOn && !musicTimer) startMusic();
+    if (unlocked) return;
+    unlocked = true;
+    // 補播一個空 buffer 是 iOS 解鎖的老招
+    const src = audioCtx.createBufferSource();
+    src.buffer = audioCtx.createBuffer(1, 1, 22050);
+    src.connect(audioCtx.destination);
+    src.start(0);
+  }
+  function ensureAudio() {
+    // 行動瀏覽器要有使用者手勢後才允許建立/恢復 AudioContext，每次點擊都呼叫一次。
+    // 切背景再回來，手機常把 AudioContext 弄死（state 卡在 interrupted/suspended，resume 永遠不回來），
+    // 這時唯一解法是在手勢內丟掉重建一顆；語音 AudioBuffer 不綁 context，可以沿用不用重抓。
+    if (!audioCtx || audioCtx.state === 'closed' || ctxStale) createCtx();
+    if (!audioCtx) return;
+    if (audioCtx.state === 'running') { onAudioRunning(); return; }
+    const ctx = audioCtx;
+    ctx.resume().then(() => { if (ctx === audioCtx && ctx.state === 'running') onAudioRunning(); });
+    setTimeout(() => { if (ctx === audioCtx && ctx.state !== 'running') ctxStale = true; }, 500);
+  }
   // 第一次碰螢幕就先解鎖音訊（touchend 在 click 之前，手機上更保險）
   // 每次碰螢幕都確認一次：背景回來後 iOS 要在手勢內 resume，音樂才會續播
   document.addEventListener('touchend', ensureAudio, { passive: true });
@@ -261,7 +268,7 @@
   // 切到背景時停音樂排程（避免醒來一次塞一堆音），回前景再接上
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
-    else if (musicWanted) { ensureAudio(); startMusic(); }
+    else if (audioCtx) ensureAudio();   // 回前景先試 resume；失敗會標記 stale，下一次碰螢幕就重建
   });
   function tone(freq, duration, type, gainValue, when, dest, sustain) {
     // sustain：0～1，音量撐住多久才開始衰減；音效用 0（點一下就散），音樂用較大值才聽得到旋律
