@@ -224,8 +224,26 @@
         musicGain.connect(audioCtx.destination);
       }
     }
-    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx && audioCtx.state !== 'running') {
+      // iOS 切回前景後 state 會是 'interrupted'，也要 resume；resume 完補播一個空 buffer 是 iOS 解鎖的老招
+      audioCtx.resume().then(() => {
+        if (unlocked) return;
+        unlocked = true;
+        const src = audioCtx.createBufferSource();
+        src.buffer = audioCtx.createBuffer(1, 1, 22050);
+        src.connect(audioCtx.destination);
+        src.start(0);
+      });
+    }
   }
+  let unlocked = false;
+  // 第一次碰螢幕就先解鎖音訊（touchend 在 click 之前，手機上更保險）
+  document.addEventListener('touchend', ensureAudio, { once: true, passive: true });
+  // 切到背景時停音樂排程（避免醒來一次塞一堆音），回前景再接上
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
+    else if (musicWanted) { ensureAudio(); startMusic(); }
+  });
   function tone(freq, duration, type, gainValue, when, dest, sustain) {
     // sustain：0～1，音量撐住多久才開始衰減；音效用 0（點一下就散），音樂用較大值才聽得到旋律
     if (!audioCtx) return;
@@ -325,7 +343,46 @@
   document.querySelectorAll('.btn-music').forEach(b => b.addEventListener('click', toggleMusic));
   renderMusicButtons();
 
-  // ====== 語音：Web Speech API，英文 ======
+  // ====== 語音：預錄 mp3（voice/*.mp3，Edge TTS Ana 小女孩聲，由 tools/gen_voice.py 產生）======
+  // 用 Web Audio 解碼播放而不是 <audio>，因為 AudioContext 已被手勢解鎖，setTimeout 後播放 iOS 也不會擋。
+  // 檔案載不到（離線缺檔、舊瀏覽器）就退回瀏覽器內建 TTS。
+  const voiceCache = new Map();   // key -> Promise<AudioBuffer|null>
+  let voiceSrc = null, speakSeq = 0;
+  function loadVoice(key) {
+    if (!voiceCache.has(key)) {
+      voiceCache.set(key, fetch(`voice/${key}.mp3`)
+        .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status)))
+        .then(b => audioCtx.decodeAudioData(b))
+        .catch(() => null));
+    }
+    return voiceCache.get(key);
+  }
+  function preloadVoices(keys) { keys.forEach(k => loadVoice(k)); }
+  function speak(key, text) {
+    stopSpeak();
+    const token = ++speakSeq;
+    duckMusic(true);
+    const done = () => { if (token === speakSeq) duckMusic(false); };
+    if (!audioCtx) { speakTTS(text, done); return; }
+    loadVoice(key).then(buf => {
+      if (token !== speakSeq) return;   // 期間又點了別的，這句作廢
+      if (!buf) { speakTTS(text, done); return; }
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.onended = done;
+      src.start();
+      voiceSrc = src;
+    });
+  }
+  function stopSpeak() {
+    speakSeq++;
+    if (voiceSrc) { try { voiceSrc.stop(); } catch (e) { /* 已播完 */ } voiceSrc = null; }
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    duckMusic(false);
+  }
+
+  // ====== 備援語音：Web Speech API，英文 ======
   let voice = null;
   function pickVoice() {
     if (!('speechSynthesis' in window)) return;
@@ -334,19 +391,16 @@
     voice = voices.find(v => /^en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || null;
   }
   if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-  function speak(text) {
-    if (!('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();   // 連點時打斷上一句，不排隊
+  function speakTTS(text, done) {
+    if (!('speechSynthesis' in window)) { done(); return; }
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-US';
     if (voice) u.voice = voice;
     u.rate = 0.85;   // 稍慢，小小孩聽得清楚
     u.pitch = 1.1;
-    duckMusic(true);
-    u.onend = u.onerror = () => duckMusic(false);
+    u.onend = u.onerror = done;
     speechSynthesis.speak(u);
   }
-  function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); duckMusic(false); }
 
   // ====== 小特效 ======
   // 一次性動畫：加 class、播完自動拿掉，才不會蓋掉元素本身的閒置動畫（搖擺/漂浮）
@@ -421,6 +475,9 @@
     items = m === 'abc' ? LETTERS : NUMBERS;
     sfx.start();
     startMusic();
+    // 背景先把這個模式會用到的語音抓好，之後點了馬上有聲音
+    const pre = mode === 'abc' ? ['abc_', 'word_', 'find_', 'yay_'] : ['num_', 'count_', 'find_', 'yay_'];
+    preloadVoices(items.flatMap(([g]) => pre.map(prefix => prefix + g)));
     if (game === 'explore') enterExplore(); else enterFind();
   }
 
@@ -455,8 +512,8 @@
   }
   function sayCurrent() {
     const [g, w] = items[index];
-    if (mode === 'abc') speak(`${g} is for ${w}.`);
-    else speak(`${w} ${NUMBER_NOUNS[index]}.`);
+    if (mode === 'abc') speak(`abc_${g}`, `${g} is for ${w}.`);
+    else speak(`num_${g}`, `${w} ${NUMBER_NOUNS[index]}.`);
   }
   function go(delta) {
     index = (index + delta + items.length) % items.length;
@@ -476,7 +533,8 @@
     if (t.parentElement === pics) {
       // 點小圖：跳一下；數字模式唸第幾個，字母模式唸單字
       sfx.pop(); animate(t, 'pop'); spawnStars(e.clientX, e.clientY, 4);
-      speak(mode === 'num' ? NUMBER_WORDS[Number(t.dataset.n) - 1] : items[index][1]);
+      if (mode === 'num') speak(`count_${t.dataset.n}`, NUMBER_WORDS[Number(t.dataset.n) - 1]);
+      else speak(`word_${items[index][0]}`, items[index][1]);
       return;
     }
     sfx.tap(); bounce(glyph); spawnStars(e.clientX, e.clientY); sayCurrent();
@@ -497,7 +555,7 @@
   const options = $('options'), score = $('score');
   let target = null, locked = false, streak = 0;
 
-  function sayPrompt() { speak(`Find ${target[0]}.`); }
+  function sayPrompt() { speak(`find_${target[0]}`, `Find ${target[0]}.`); }
   function newQuestion() {
     locked = false;
     let next;
@@ -525,7 +583,7 @@
       // 答對：鎖住、放星星彩紙、歡呼，再出下一題
       locked = true; streak++;
       btn.classList.add('right'); spawnStars(x, y, 10); spawnConfetti(x, y, 36); sfx.yay();
-      speak(mode === 'abc' ? `Yay! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
+      speak(`yay_${target[0]}`, mode === 'abc' ? `Yay! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
       score.textContent = '⭐'.repeat(Math.min(streak, 10));
       setTimeout(newQuestion, mode === 'abc' ? 2600 : 1800);
     } else {
