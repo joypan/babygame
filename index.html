@@ -14,12 +14,26 @@
   body { background: #fff8e1; transition: background 0.4s ease; }
   button { font-family: inherit; }
 
-  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; }
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1; }
   .screen.active { display: flex; }
+
+  /* ====== 背景漂浮裝飾（雲、氣球、泡泡），從下往上慢慢飄 ====== */
+  #sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  #sky span {
+    position: absolute; bottom: -15vh; left: var(--x); font-size: var(--s); opacity: 0;
+    animation: drift var(--d) linear infinite; animation-delay: var(--delay);
+  }
+  @keyframes drift {
+    0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.55; }
+    90%  { opacity: 0.55; }
+    100% { transform: translateY(-125vh) translateX(6vw) rotate(12deg); opacity: 0; }
+  }
 
   /* ====== 首頁 ====== */
   #home { gap: 3vh; padding: 16px; }
-  #home h1 { font-size: clamp(24px, 5vmin, 56px); color: #5d4037; margin: 0; text-shadow: 2px 2px 0 #fff; }
+  #home h1 { font-size: clamp(24px, 5vmin, 56px); color: #5d4037; margin: 0; text-shadow: 2px 2px 0 #fff; animation: wiggle 2.4s ease-in-out infinite; }
+  @keyframes wiggle { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
 
   /* 遊戲切換（探索 / 找找看） */
   .game-toggle { display: flex; background: #fff; border-radius: 40px; padding: 6px; box-shadow: 0 6px 0 rgba(0,0,0,0.12); }
@@ -29,27 +43,31 @@
   }
   .game-toggle button.on { background: #ffb74d; color: #fff; }
 
-  /* 兩顆超大模式按鈕：字型跟按鈕邊長連動，不會爆框 */
+  /* 兩顆超大模式按鈕：字型跟按鈕邊長連動，不會爆框；閒置時上下漂浮吸引小孩點 */
   .mode-row { display: flex; gap: 5vmin; justify-content: center; }
   .mode-btn {
     --size: min(40vw, 42vh);
     width: var(--size); height: var(--size); border: none; border-radius: 12%; cursor: pointer; overflow: hidden;
     font-size: calc(var(--size) * 0.36); font-weight: 900; color: #fff; letter-spacing: -0.02em;
     box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
-    transition: transform 0.1s;
+    animation: floaty 3s ease-in-out infinite;
   }
-  .mode-btn:active { transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+  #btn-123 { animation-delay: -1.5s; }
+  @keyframes floaty { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-2.5vh) rotate(1.5deg); } }
+  .mode-btn:active { animation: none; transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
   #btn-abc { background: linear-gradient(145deg, #ff7043, #e53935); }
   #btn-123 { background: linear-gradient(145deg, #42a5f5, #1e88e5); }
 
   /* ====== 遊戲頁共用 ====== */
   .play { justify-content: space-between; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
-  .topbar { width: 100%; display: flex; justify-content: flex-start; padding: 12px 16px; }
+  .topbar { width: 100%; display: flex; justify-content: space-between; padding: 12px 16px; }
   .round-btn {
     width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px;
     background: #fff; color: #5d4037; box-shadow: 0 6px 0 rgba(0,0,0,0.15);
   }
   .round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+  .btn-music.off { opacity: 0.5; }
+  #home .btn-music { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 16px; }
   .navbar { width: 100%; display: flex; justify-content: space-between; padding: 8px 20px 20px; }
   .arrow-btn {
     --size: min(20vw, 15vh, 110px);
@@ -64,11 +82,19 @@
   #glyph {
     font-size: min(34vh, 40vw); line-height: 1; font-weight: 900; color: #fff;
     text-shadow: 0 8px 0 rgba(0,0,0,0.15), 0 16px 30px rgba(0,0,0,0.2);
+    animation: sway 2.6s ease-in-out infinite;   /* 閒置時輕微搖擺呼吸 */
   }
+  @keyframes sway { 0%, 100% { transform: rotate(-4deg) scale(1); } 50% { transform: rotate(4deg) scale(1.06); } }
   #pics { display: flex; flex-wrap: wrap; justify-content: center; gap: 1vmin; max-width: 92vw; }
-  #pics span { font-size: min(9vh, 12vw); line-height: 1; cursor: pointer; display: inline-block; }
+  #pics span { font-size: min(9vh, 12vw); line-height: 1; cursor: pointer; display: inline-block; animation: hop 1.8s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -0.25s); }
   #pics.many span { font-size: min(6vh, 8vw); }   /* 數字 6–10 張圖時縮小，避免擠出版面 */
+  @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8%); } }
   #word { font-size: min(6vh, 7vw); font-weight: 700; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.15); letter-spacing: 2px; text-align: center; }
+  /* 換頁時整張卡從左/右滑入 */
+  .slide-left  { animation: slideL 0.35s ease-out; }
+  .slide-right { animation: slideR 0.35s ease-out; }
+  @keyframes slideL { from { transform: translateX(60vw); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes slideR { from { transform: translateX(-60vw); opacity: 0; } to { transform: none; opacity: 1; } }
 
   /* ====== 找找看 ====== */
   #quiz { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; padding: 0 16px; }
@@ -76,34 +102,49 @@
     display: flex; align-items: center; gap: 3vmin; cursor: pointer;
     font-size: min(8vh, 10vw); font-weight: 900; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,0.15);
   }
-  #prompt .hint { font-size: min(9vh, 11vw); line-height: 1; }
+  #prompt .hint { font-size: min(9vh, 11vw); line-height: 1; animation: hop 1.8s ease-in-out infinite; }
   #options { display: flex; gap: 3vmin; justify-content: center; width: 100%; }
   .opt {
     --size: min(27vw, 36vh);
     width: var(--size); height: var(--size); border: none; border-radius: 14%; cursor: pointer; overflow: hidden;
     font-size: calc(var(--size) * 0.6); font-weight: 900; color: #5d4037; background: #fff;
     box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
-    transition: transform 0.1s, background 0.2s;
+    transition: transform 0.1s, background 0.2s, opacity 0.3s;
+    animation: popin 0.4s cubic-bezier(.2,1.6,.4,1) backwards; animation-delay: calc(var(--i, 0) * 0.08s);
   }
+  @keyframes popin { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .opt:active { transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
-  .opt.right { background: #ffee58; color: #e65100; }
+  .opt.right { background: #ffee58; color: #e65100; animation: flash 0.5s ease 3; }
+  @keyframes flash { 0%, 100% { background: #ffee58; transform: scale(1); } 50% { background: #fff; transform: scale(1.15) rotate(-4deg); } }
+  .opt.dim { opacity: 0.45; }   /* 答錯的選項淡掉，剩下的更好找 */
   #score { font-size: min(4vh, 5vw); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.15); letter-spacing: 4px; min-height: 1.4em; }
 
   /* ====== 動畫 ====== */
   .bounce { animation: bounce 0.5s ease; }
   @keyframes bounce { 0% { transform: scale(1); } 30% { transform: scale(1.25) rotate(-5deg); } 60% { transform: scale(0.95) rotate(3deg); } 100% { transform: scale(1); } }
   .pop { animation: pop 0.4s ease; }
-  @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
+  @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5) rotate(10deg); } 100% { transform: scale(1); } }
   .shake { animation: shake 0.4s ease; }
   @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-14px); } 40% { transform: translateX(14px); } 60% { transform: translateX(-10px); } 80% { transform: translateX(10px); } }
   .star { position: absolute; font-size: 40px; pointer-events: none; z-index: 9; animation: fly 1s ease-out forwards; }
   @keyframes fly { to { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; } }
+  .confetti {
+    position: absolute; width: 14px; height: 14px; border-radius: 3px; pointer-events: none; z-index: 9;
+    background: var(--c); animation: confetti 1.3s ease-in forwards;
+  }
+  @keyframes confetti {
+    0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) rotate(720deg); opacity: 0; }
+  }
 </style>
 </head>
 <body>
 
+<div id="sky"></div>
+
 <!-- ===== 首頁：選遊戲（探索/找找看）＋ 選內容（ABC/123） ===== -->
 <section id="home" class="screen active">
+  <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
   <h1>點一下開始玩 🎈</h1>
   <div class="game-toggle">
     <button data-game="explore" class="on">📖 探索</button>
@@ -117,7 +158,10 @@
 
 <!-- ===== 探索頁 ===== -->
 <section id="explore" class="screen play">
-  <div class="topbar"><button class="round-btn btn-home" aria-label="回首頁">🏠</button></div>
+  <div class="topbar">
+    <button class="round-btn btn-home" aria-label="回首頁">🏠</button>
+    <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
+  </div>
   <div id="card">
     <div id="glyph">A</div>
     <div id="pics"></div>
@@ -131,7 +175,10 @@
 
 <!-- ===== 找找看頁 ===== -->
 <section id="find" class="screen play">
-  <div class="topbar"><button class="round-btn btn-home" aria-label="回首頁">🏠</button></div>
+  <div class="topbar">
+    <button class="round-btn btn-home" aria-label="回首頁">🏠</button>
+    <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
+  </div>
   <div id="quiz">
     <div id="prompt"><span class="hint">🔍</span><span id="prompt-text">Find A!</span></div>
     <div id="options"></div>
@@ -165,15 +212,21 @@
 
   // ====== 音效：Web Audio 合成，不需音檔 ======
   let audioCtx = null;
+  let musicGain = null;   // 背景音樂總音量，唸單字時壓低
   function ensureAudio() {
     // 行動瀏覽器要有使用者手勢後才允許建立/恢復 AudioContext，每次點擊都呼叫一次
     if (!audioCtx) {
       const AC = window.AudioContext || window.webkitAudioContext;
-      if (AC) audioCtx = new AC();
+      if (AC) {
+        audioCtx = new AC();
+        musicGain = audioCtx.createGain();
+        musicGain.gain.value = MUSIC_VOL;
+        musicGain.connect(audioCtx.destination);
+      }
     }
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   }
-  function tone(freq, duration, type, gainValue, when) {
+  function tone(freq, duration, type, gainValue, when, dest) {
     if (!audioCtx) return;
     const t0 = audioCtx.currentTime + (when || 0);
     const osc = audioCtx.createOscillator();
@@ -182,7 +235,7 @@
     osc.frequency.setValueAtTime(freq, t0);
     gain.gain.setValueAtTime(gainValue || 0.2, t0);
     gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
-    osc.connect(gain).connect(audioCtx.destination);
+    osc.connect(gain).connect(dest || audioCtx.destination);
     osc.start(t0);
     osc.stop(t0 + duration);
   }
@@ -194,6 +247,76 @@
     yay()   { [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, 0.3, 'triangle', 0.22, i * 0.09)); },
     nope()  { tone(300, 0.18, 'sine', 0.15); },
   };
+
+  // ====== 背景音樂：小星星旋律用 Web Audio 排程循環播放，離線可用 ======
+  const MUSIC_VOL = 0.11;        // 平常音量
+  const MUSIC_DUCK = 0.03;       // 唸單字時的音量
+  const BEAT = 0.42;             // 每拍秒數（約 143 bpm，輕快）
+  const N = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, C3: 130.81, F3: 174.61, G3: 196 };
+  // 主旋律 [頻率, 拍數]
+  const MELODY = [
+    [N.C5,1],[N.C5,1],[N.G5,1],[N.G5,1],[N.A5,1],[N.A5,1],[N.G5,2], [N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,1],[N.D5,1],[N.C5,2],
+    [N.G5,1],[N.G5,1],[N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,2], [N.G5,1],[N.G5,1],[N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,2],
+    [N.C5,1],[N.C5,1],[N.G5,1],[N.G5,1],[N.A5,1],[N.A5,1],[N.G5,2], [N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,1],[N.D5,1],[N.C5,2],
+  ];
+  // 低音：每兩拍一顆，跟著和弦走
+  const BASS = [
+    N.C3,N.C3, N.F3,N.C3, N.F3,N.C3, N.G3,N.C3,
+    N.C3,N.G3, N.C3,N.G3, N.C3,N.G3, N.C3,N.G3,
+    N.C3,N.C3, N.F3,N.C3, N.F3,N.C3, N.G3,N.C3,
+  ];
+  let musicOn = localStorage.getItem('babygame.music') !== 'off';   // 預設開
+  let musicTimer = null, musicWanted = false;
+  let melodyIdx = 0, melodyTime = 0, bassIdx = 0, bassTime = 0;
+
+  function scheduleMusic() {
+    // 每 100ms 醒來一次，把接下來 0.35 秒內該響的音先排進 AudioContext，避免 setInterval 抖動
+    const horizon = audioCtx.currentTime + 0.35;
+    while (melodyTime < horizon) {
+      const [f, beats] = MELODY[melodyIdx];
+      tone(f, beats * BEAT * 0.9, 'triangle', 0.5, melodyTime - audioCtx.currentTime, musicGain);
+      melodyTime += beats * BEAT;
+      melodyIdx = (melodyIdx + 1) % MELODY.length;
+    }
+    while (bassTime < horizon) {
+      tone(BASS[bassIdx], BEAT * 1.6, 'sine', 0.6, bassTime - audioCtx.currentTime, musicGain);
+      bassTime += BEAT * 2;
+      bassIdx = (bassIdx + 1) % BASS.length;
+    }
+  }
+  function startMusic() {
+    musicWanted = true;
+    if (!musicOn || !audioCtx || musicTimer) return;
+    melodyIdx = bassIdx = 0;
+    melodyTime = bassTime = audioCtx.currentTime + 0.1;
+    scheduleMusic();
+    musicTimer = setInterval(scheduleMusic, 100);
+  }
+  function stopMusic() {
+    musicWanted = false;
+    if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
+  }
+  function duckMusic(on) {
+    if (!musicGain) return;
+    musicGain.gain.setTargetAtTime(on ? MUSIC_DUCK : MUSIC_VOL, audioCtx.currentTime, 0.08);
+  }
+  function renderMusicButtons() {
+    document.querySelectorAll('.btn-music').forEach(b => {
+      b.textContent = musicOn ? '🎵' : '🔇';
+      b.classList.toggle('off', !musicOn);
+    });
+  }
+  function toggleMusic() {
+    ensureAudio();
+    musicOn = !musicOn;
+    localStorage.setItem('babygame.music', musicOn ? 'on' : 'off');
+    renderMusicButtons();
+    if (!musicOn) { const w = musicWanted; stopMusic(); musicWanted = w; }
+    else if (musicWanted) { musicTimer = null; startMusic(); }
+    sfx.pop();
+  }
+  document.querySelectorAll('.btn-music').forEach(b => b.addEventListener('click', toggleMusic));
+  renderMusicButtons();
 
   // ====== 語音：Web Speech API，英文 ======
   let voice = null;
@@ -212,12 +335,19 @@
     if (voice) u.voice = voice;
     u.rate = 0.85;   // 稍慢，小小孩聽得清楚
     u.pitch = 1.1;
+    duckMusic(true);
+    u.onend = u.onerror = () => duckMusic(false);
     speechSynthesis.speak(u);
   }
-  function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+  function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); duckMusic(false); }
 
   // ====== 小特效 ======
-  function bounce(el) { el.classList.remove('bounce'); void el.offsetWidth; el.classList.add('bounce'); }
+  // 一次性動畫：加 class、播完自動拿掉，才不會蓋掉元素本身的閒置動畫（搖擺/漂浮）
+  function animate(el, cls) {
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
+  }
+  function bounce(el) { animate(el, 'bounce'); }
   function spawnStars(x, y, n) {
     n = n || 6;
     for (let i = 0; i < n; i++) {
@@ -232,11 +362,39 @@
       setTimeout(() => s.remove(), 1000);
     }
   }
+  function spawnConfetti(x, y, n) {
+    // 彩紙：往上噴、往下落，顏色隨機
+    for (let i = 0; i < (n || 30); i++) {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.left = x + 'px'; c.style.top = y + 'px';
+      c.style.setProperty('--c', COLORS[randInt(COLORS.length)]);
+      c.style.setProperty('--dx', (Math.random() * 2 - 1) * 320 + 'px');
+      c.style.setProperty('--dy', (Math.random() * -260 - 60 + Math.random() * 500) + 'px');
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 1300);
+    }
+  }
   function randInt(n) { return Math.floor(Math.random() * n); }
   function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
 
+  // 背景漂浮裝飾：一次放好，CSS 無限循環
+  (function buildSky() {
+    const sky = $('sky');
+    const DECOR = ['☁️', '🎈', '🫧', '☁️', '🎈', '🫧', '🌈', '🦋', '☁️', '🎈', '🫧', '🐝'];
+    DECOR.forEach((d, i) => {
+      const s = document.createElement('span');
+      s.textContent = d;
+      s.style.setProperty('--x', (i * 8.3 + Math.random() * 6) + 'vw');
+      s.style.setProperty('--s', (4 + Math.random() * 5) + 'vmin');
+      s.style.setProperty('--d', (14 + Math.random() * 12) + 's');
+      s.style.setProperty('--delay', (-Math.random() * 24) + 's');
+      sky.appendChild(s);
+    });
+  })();
+
   // ====== 共同狀態與畫面切換 ======
-  const $ = (id) => document.getElementById(id);
+  function $(id) { return document.getElementById(id); }
   let game = 'explore';   // 'explore' | 'find'
   let mode = 'abc';       // 'abc' | 'num'
   let items = LETTERS;
@@ -246,6 +404,7 @@
   }
   function goHome() {
     stopSpeak();
+    stopMusic();
     show('home');
     document.body.style.background = '#fff8e1';
   }
@@ -254,6 +413,7 @@
     mode = m;
     items = m === 'abc' ? LETTERS : NUMBERS;
     sfx.start();
+    startMusic();
     if (game === 'explore') enterExplore(); else enterFind();
   }
 
@@ -269,7 +429,7 @@
   const explore = $('explore'), glyph = $('glyph'), pics = $('pics'), word = $('word'), card = $('card');
   let index = 0;
 
-  function renderExplore() {
+  function renderExplore(dir) {
     const [g, w, pic] = items[index];
     glyph.textContent = g;
     word.textContent = mode === 'abc' ? `${g} is for ${w}` : `${w} ${NUMBER_NOUNS[index]}`;
@@ -280,24 +440,25 @@
     pics.classList.toggle('many', count > 5);
     for (let i = 0; i < count; i++) {
       const s = document.createElement('span');
-      s.textContent = pic; s.dataset.n = i + 1;
+      s.textContent = pic; s.dataset.n = i + 1; s.style.setProperty('--i', i);
       pics.appendChild(s);
     }
+    if (dir) animate(card, dir > 0 ? 'slide-left' : 'slide-right');
     bounce(glyph);
   }
   function sayCurrent() {
     const [g, w] = items[index];
-    if (mode === 'abc') speak(`${g}. ${g} is for ${w}.`);
-    else speak(`${w}. ${w} ${NUMBER_NOUNS[index]}.`);
+    if (mode === 'abc') speak(`${g} is for ${w}.`);
+    else speak(`${w} ${NUMBER_NOUNS[index]}.`);
   }
   function go(delta) {
     index = (index + delta + items.length) % items.length;
-    sfx.swipe(); renderExplore(); sayCurrent();
+    sfx.swipe(); renderExplore(delta); sayCurrent();
   }
   function enterExplore() {
     index = 0;
     show('explore');
-    renderExplore();
+    renderExplore(0);
     setTimeout(sayCurrent, 350);
   }
   $('btn-prev').addEventListener('click', () => go(-1));
@@ -305,10 +466,10 @@
   card.addEventListener('click', (e) => {
     ensureAudio();
     const t = e.target;
-    if (t.parentElement === pics && mode === 'num') {   // 點小圖：唸第幾個
-      sfx.pop();
-      t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop');
-      speak(NUMBER_WORDS[Number(t.dataset.n) - 1]);
+    if (t.parentElement === pics) {
+      // 點小圖：跳一下；數字模式唸第幾個，字母模式唸單字
+      sfx.pop(); animate(t, 'pop'); spawnStars(e.clientX, e.clientY, 4);
+      speak(mode === 'num' ? NUMBER_WORDS[Number(t.dataset.n) - 1] : items[index][1]);
       return;
     }
     sfx.tap(); bounce(glyph); spawnStars(e.clientX, e.clientY); sayCurrent();
@@ -343,9 +504,9 @@
     hint.textContent = target[2];
     bounce(prompt);
     options.innerHTML = '';
-    choices.forEach(([g]) => {
+    choices.forEach(([g], i) => {
       const b = document.createElement('button');
-      b.className = 'opt'; b.textContent = g; b.dataset.g = g;
+      b.className = 'opt'; b.textContent = g; b.dataset.g = g; b.style.setProperty('--i', i);
       options.appendChild(b);
     });
     setTimeout(sayPrompt, 300);
@@ -354,15 +515,15 @@
     if (locked) return;
     ensureAudio();
     if (btn.dataset.g === target[0]) {
-      // 答對：鎖住、放星星、歡呼，再出下一題
+      // 答對：鎖住、放星星彩紙、歡呼，再出下一題
       locked = true; streak++;
-      btn.classList.add('right'); bounce(btn); spawnStars(x, y, 10); sfx.yay();
-      speak(mode === 'abc' ? `Yay! ${target[0]}! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
+      btn.classList.add('right'); spawnStars(x, y, 10); spawnConfetti(x, y, 36); sfx.yay();
+      speak(mode === 'abc' ? `Yay! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
       score.textContent = '⭐'.repeat(Math.min(streak, 10));
       setTimeout(newQuestion, mode === 'abc' ? 2600 : 1800);
     } else {
-      // 答錯：只搖一下、再唸一次題目，不給負面提示
-      btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+      // 答錯：只搖一下、淡掉、再唸一次題目，不給負面提示
+      animate(btn, 'shake'); btn.classList.add('dim');
       sfx.nope();
       setTimeout(sayPrompt, 250);
     }
