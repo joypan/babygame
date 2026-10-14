@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>探索 ABC 123</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* 探索頁專用：大字卡，點整張卡就發音 */
+  #card { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 2vh; }
+  #glyph {
+    font-size: clamp(120px, 42vh, 420px); line-height: 1; font-weight: 900; color: #fff;
+    text-shadow: 0 8px 0 rgba(0,0,0,0.15), 0 16px 30px rgba(0,0,0,0.2);
+  }
+  #pics { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5vw; max-width: 90vw; }
+  #pics span { font-size: clamp(48px, 9vh, 120px); line-height: 1; cursor: pointer; display: inline-block; }
+  #word { font-size: clamp(28px, 6vh, 72px); font-weight: 700; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.15); letter-spacing: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ===== 首頁 ===== -->
+<section id="home" class="screen active">
+  <a class="switch-link" href="find.html">🔍 找找看</a>
+  <h1>點一下開始玩 🎈</h1>
+  <div class="mode-row">
+    <button id="btn-abc" class="mode-btn" data-mode="abc">ABC</button>
+    <button id="btn-123" class="mode-btn" data-mode="num">123</button>
+  </div>
+</section>
+
+<!-- ===== 探索頁 ===== -->
+<section id="play" class="screen">
+  <div class="topbar">
+    <button id="btn-home" class="round-btn" aria-label="回首頁">🏠</button>
+  </div>
+  <div id="card">
+    <div id="glyph">A</div>
+    <div id="pics"></div>
+    <div id="word">Apple</div>
+  </div>
+  <div class="navbar">
+    <button id="btn-prev" class="arrow-btn" aria-label="上一個">◀</button>
+    <button id="btn-next" class="arrow-btn" aria-label="下一個">▶</button>
+  </div>
+</section>
+
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { LETTERS, NUMBERS, NUMBER_WORDS, NUMBER_NOUNS, COLORS, ensureAudio, sfx, speak, stopSpeak, bounce, spawnStars } = window.Baby;
+
+  let mode = 'abc';   // 'abc' | 'num'
+  let index = 0;
+  let items = LETTERS;
+
+  const $ = (id) => document.getElementById(id);
+  const home = $('home'), play = $('play');
+  const glyph = $('glyph'), pics = $('pics'), word = $('word'), card = $('card');
+
+  function render() {
+    const [g, w, pic] = items[index];
+    glyph.textContent = g;
+    word.textContent = mode === 'abc' ? `${g} is for ${w}` : `${w} ${NUMBER_NOUNS[index]}`;
+    document.body.style.background = COLORS[index % COLORS.length];
+
+    // 字母：一張圖；數字：幾就放幾張，可以逐個點來數數
+    pics.innerHTML = '';
+    const count = mode === 'abc' ? 1 : index + 1;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('span');
+      s.textContent = pic;
+      s.dataset.n = i + 1;
+      pics.appendChild(s);
+    }
+    bounce(glyph);
+  }
+
+  function sayCurrent() {
+    const [g, w] = items[index];
+    if (mode === 'abc') speak(`${g}. ${g} is for ${w}.`);
+    else speak(`${w}. ${w} ${NUMBER_NOUNS[index]}.`);
+  }
+
+  function go(delta) {
+    index = (index + delta + items.length) % items.length;
+    sfx.swipe();
+    render();
+    sayCurrent();
+  }
+  function enter(m) {
+    ensureAudio();
+    mode = m;
+    items = m === 'abc' ? LETTERS : NUMBERS;
+    index = 0;
+    home.classList.remove('active');
+    play.classList.add('active');
+    sfx.start();
+    render();
+    setTimeout(sayCurrent, 350);
+  }
+  function goHome() {
+    stopSpeak();
+    play.classList.remove('active');
+    home.classList.add('active');
+    document.body.style.background = '#fff8e1';
+  }
+
+  document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => enter(b.dataset.mode)));
+  $('btn-home').addEventListener('click', goHome);
+  $('btn-prev').addEventListener('click', () => go(-1));
+  $('btn-next').addEventListener('click', () => go(1));
+
+  // 點字卡：發音 + 星星；數字模式點小圖：唸出第幾個（數數）
+  card.addEventListener('click', (e) => {
+    ensureAudio();
+    const target = e.target;
+    if (target.parentElement === pics && mode === 'num') {
+      sfx.pop();
+      target.classList.remove('pop'); void target.offsetWidth; target.classList.add('pop');
+      speak(NUMBER_WORDS[Number(target.dataset.n) - 1]);
+      return;
+    }
+    sfx.tap();
+    bounce(glyph);
+    spawnStars(e.clientX, e.clientY);
+    sayCurrent();
+  });
+
+  // 左右滑動換頁（平板）
+  let touchX = null, touchY = null;
+  play.addEventListener('touchstart', (e) => {
+    touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
+  }, { passive: true });
+  play.addEventListener('touchend', (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    const dy = e.changedTouches[0].clientY - touchY;
+    touchX = touchY = null;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  // 鍵盤（電腦上測試用）
+  document.addEventListener('keydown', (e) => {
+    if (!play.classList.contains('active')) return;
+    if (e.key === 'ArrowRight') go(1);
+    else if (e.key === 'ArrowLeft') go(-1);
+    else if (e.key === ' ' || e.key === 'Enter') { ensureAudio(); sfx.tap(); bounce(glyph); sayCurrent(); }
+  });
+})();
+</script>
+</body>
+</html>

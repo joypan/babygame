@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>找找看 ABC 123</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* 找找看專用：上方題目、中間三張大卡 */
+  #quiz { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4vh; padding: 0 16px; }
+  #prompt {
+    display: flex; align-items: center; gap: 3vw; cursor: pointer;
+    font-size: clamp(36px, 8vh, 96px); font-weight: 900; color: #fff;
+    text-shadow: 0 4px 0 rgba(0,0,0,0.15);
+  }
+  #prompt .hint { font-size: clamp(40px, 9vh, 110px); line-height: 1; }
+  #options { display: flex; gap: 4vw; justify-content: center; width: 100%; }
+  .opt {
+    width: min(26vw, 36vh); height: min(26vw, 36vh); border: none; border-radius: 40px; cursor: pointer;
+    font-size: clamp(64px, 16vw, 200px); font-weight: 900; color: #5d4037; background: #fff;
+    box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
+    transition: transform 0.1s, background 0.2s;
+  }
+  .opt:active { transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+  .opt.right { background: #ffee58; color: #e65100; }
+  #score { font-size: clamp(24px, 4vh, 40px); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.15); letter-spacing: 4px; min-height: 1.4em; }
+</style>
+</head>
+<body>
+
+<!-- ===== 首頁 ===== -->
+<section id="home" class="screen active">
+  <a class="switch-link" href="index.html">📖 探索</a>
+  <h1>找找看 🔍</h1>
+  <div class="mode-row">
+    <button id="btn-abc" class="mode-btn" data-mode="abc">ABC</button>
+    <button id="btn-123" class="mode-btn" data-mode="num">123</button>
+  </div>
+</section>
+
+<!-- ===== 遊戲頁 ===== -->
+<section id="play" class="screen">
+  <div class="topbar">
+    <button id="btn-home" class="round-btn" aria-label="回首頁">🏠</button>
+  </div>
+  <div id="quiz">
+    <div id="prompt"><span class="hint">🔍</span><span id="prompt-text">Find A!</span></div>
+    <div id="options"></div>
+    <div id="score"></div>
+  </div>
+  <div class="navbar">
+    <button id="btn-repeat" class="arrow-btn" aria-label="再聽一次">🔊</button>
+    <button id="btn-next" class="arrow-btn" aria-label="下一題">▶</button>
+  </div>
+</section>
+
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  const { LETTERS, NUMBERS, COLORS, ensureAudio, sfx, speak, stopSpeak, bounce, spawnStars } = window.Baby;
+
+  const OPTION_COUNT = 3;   // 2–4 歲三選一剛好，不會太難
+  let mode = 'abc';
+  let items = LETTERS;
+  let target = null;        // 目前要找的 [字, 單字, 圖]
+  let locked = false;       // 答對後短暫鎖住，避免連點跳題
+  let streak = 0;           // 連續答對數，用星星顯示
+
+  const $ = (id) => document.getElementById(id);
+  const home = $('home'), play = $('play');
+  const prompt = $('prompt'), promptText = $('prompt-text'), hint = prompt.querySelector('.hint');
+  const options = $('options'), score = $('score');
+
+  function randInt(n) { return Math.floor(Math.random() * n); }
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+    return arr;
+  }
+
+  function sayPrompt() {
+    speak(`Find ${target[0]}.`);
+  }
+
+  function newQuestion() {
+    locked = false;
+    // 題目不跟上一題重複
+    let next;
+    do { next = items[randInt(items.length)]; } while (target && next[0] === target[0]);
+    target = next;
+
+    // 兩個干擾選項，不跟答案重複
+    const pool = shuffle(items.filter(it => it[0] !== target[0])).slice(0, OPTION_COUNT - 1);
+    const choices = shuffle([target, ...pool]);
+
+    document.body.style.background = COLORS[randInt(COLORS.length)];
+    promptText.textContent = `Find ${target[0]}!`;
+    hint.textContent = target[2];
+    bounce(prompt);
+
+    options.innerHTML = '';
+    choices.forEach(([g]) => {
+      const b = document.createElement('button');
+      b.className = 'opt';
+      b.textContent = g;
+      b.dataset.g = g;
+      options.appendChild(b);
+    });
+    setTimeout(sayPrompt, 300);
+  }
+
+  function onPick(btn, x, y) {
+    if (locked) return;
+    ensureAudio();
+    if (btn.dataset.g === target[0]) {
+      // 答對：鎖住、放煙火、歡呼，再出下一題
+      locked = true;
+      streak++;
+      btn.classList.add('right');
+      bounce(btn);
+      spawnStars(x, y, 10);
+      sfx.yay();
+      speak(mode === 'abc' ? `Yay! ${target[0]}! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
+      score.textContent = '⭐'.repeat(Math.min(streak, 10));
+      setTimeout(newQuestion, mode === 'abc' ? 2600 : 1800);
+    } else {
+      // 答錯：只搖一下、再唸一次題目，不出現負面提示
+      btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+      sfx.nope();
+      setTimeout(sayPrompt, 250);
+    }
+  }
+
+  function enter(m) {
+    ensureAudio();
+    mode = m;
+    items = m === 'abc' ? LETTERS : NUMBERS;
+    target = null;
+    streak = 0;
+    score.textContent = '';
+    home.classList.remove('active');
+    play.classList.add('active');
+    sfx.start();
+    newQuestion();
+  }
+  function goHome() {
+    stopSpeak();
+    play.classList.remove('active');
+    home.classList.add('active');
+    document.body.style.background = '#fff8e1';
+  }
+
+  document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => enter(b.dataset.mode)));
+  $('btn-home').addEventListener('click', goHome);
+  $('btn-repeat').addEventListener('click', () => { ensureAudio(); sfx.tap(); bounce(prompt); sayPrompt(); });
+  $('btn-next').addEventListener('click', () => { ensureAudio(); sfx.swipe(); newQuestion(); });
+  prompt.addEventListener('click', () => { ensureAudio(); sfx.tap(); bounce(prompt); sayPrompt(); });
+  options.addEventListener('click', (e) => {
+    const btn = e.target.closest('.opt');
+    if (btn) onPick(btn, e.clientX, e.clientY);
+  });
+})();
+</script>
+</body>
+</html>
