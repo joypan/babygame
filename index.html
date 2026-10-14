@@ -78,18 +78,29 @@
   .arrow-btn:active { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0,0,0,0.15); }
 
   /* ====== 探索頁 ====== */
+  /* 圖是主角：直式上下排，橫式字母在左、圖＋單字在右 */
   #card { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 1.5vh; padding: 0 16px; }
+  #card .side { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5vh; }
   #glyph {
-    font-size: min(34vh, 40vw); line-height: 1; font-weight: 900; color: #fff;
+    font-size: min(24vh, 36vw); line-height: 1; font-weight: 900; color: #fff;
     text-shadow: 0 8px 0 rgba(0,0,0,0.15), 0 16px 30px rgba(0,0,0,0.2);
     animation: sway 2.6s ease-in-out infinite;   /* 閒置時輕微搖擺呼吸 */
   }
   @keyframes sway { 0%, 100% { transform: rotate(-4deg) scale(1); } 50% { transform: rotate(4deg) scale(1.06); } }
   #pics { display: flex; flex-wrap: wrap; justify-content: center; gap: 1vmin; max-width: 92vw; }
-  #pics span { font-size: min(9vh, 12vw); line-height: 1; cursor: pointer; display: inline-block; animation: hop 1.8s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -0.25s); }
-  #pics.many span { font-size: min(6vh, 8vw); }   /* 數字 6–10 張圖時縮小，避免擠出版面 */
+  #pics span { font-size: min(32vh, 55vw); line-height: 1.1; cursor: pointer; display: inline-block; filter: drop-shadow(0 10px 14px rgba(0,0,0,0.25)); animation: hop 1.8s ease-in-out infinite; animation-delay: calc(var(--i, 0) * -0.25s); }
+  #pics.few  span { font-size: min(16vh, 22vw); }   /* 數字 2–5 張 */
+  #pics.many span { font-size: min(11vh, 15vw); }   /* 數字 6–10 張 */
   @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8%); } }
-  #word { font-size: min(6vh, 7vw); font-weight: 700; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.15); letter-spacing: 2px; text-align: center; }
+  #word { font-size: min(9vh, 10vw); font-weight: 900; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,0.15); letter-spacing: 2px; text-align: center; }
+  @media (orientation: landscape) {
+    #card { flex-direction: row; gap: 5vw; }
+    #glyph { font-size: min(50vh, 28vw); }
+    #pics span { font-size: min(48vh, 30vw); }
+    #pics.few  span { font-size: min(22vh, 12vw); }
+    #pics.many span { font-size: min(15vh, 9vw); }
+    #card .side { max-width: 60vw; }
+  }
   /* 換頁時整張卡從左/右滑入 */
   .slide-left  { animation: slideL 0.35s ease-out; }
   .slide-right { animation: slideR 0.35s ease-out; }
@@ -164,8 +175,10 @@
   </div>
   <div id="card">
     <div id="glyph">A</div>
-    <div id="pics"></div>
-    <div id="word">Apple</div>
+    <div class="side">
+      <div id="pics"></div>
+      <div id="word">Apple</div>
+    </div>
   </div>
   <div class="navbar">
     <button id="btn-prev" class="arrow-btn" aria-label="上一個">◀</button>
@@ -227,6 +240,8 @@
     if (audioCtx && audioCtx.state !== 'running') {
       // iOS 切回前景後 state 會是 'interrupted'，也要 resume；resume 完補播一個空 buffer 是 iOS 解鎖的老招
       audioCtx.resume().then(() => {
+        // 切背景回來 AudioContext 被中斷過，音樂排程要重新接上（這裡在使用者手勢內，手機才肯 resume）
+        if (musicWanted && musicOn && !musicTimer) startMusic();
         if (unlocked) return;
         unlocked = true;
         const src = audioCtx.createBufferSource();
@@ -234,11 +249,15 @@
         src.connect(audioCtx.destination);
         src.start(0);
       });
+    } else if (musicWanted && musicOn && !musicTimer) {
+      startMusic();
     }
   }
   let unlocked = false;
   // 第一次碰螢幕就先解鎖音訊（touchend 在 click 之前，手機上更保險）
-  document.addEventListener('touchend', ensureAudio, { once: true, passive: true });
+  // 每次碰螢幕都確認一次：背景回來後 iOS 要在手勢內 resume，音樂才會續播
+  document.addEventListener('touchend', ensureAudio, { passive: true });
+  document.addEventListener('click', ensureAudio);
   // 切到背景時停音樂排程（避免醒來一次塞一堆音），回前景再接上
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (musicTimer) { clearInterval(musicTimer); musicTimer = null; } }
@@ -269,47 +288,83 @@
     nope()  { tone(300, 0.18, 'sine', 0.15); },
   };
 
-  // ====== 背景音樂：小星星旋律用 Web Audio 排程循環播放，離線可用 ======
+  // ====== 背景音樂：童謠輪播，用 Web Audio 排程合成，離線可用 ======
   const MUSIC_VOL = 0.45;        // 平常音量
   const MUSIC_DUCK = 0.15;       // 唸單字時的音量
-  const BEAT = 0.42;             // 每拍秒數（約 143 bpm，輕快）
-  const N = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, C3: 130.81, F3: 174.61, G3: 196 };
-  // 主旋律 [頻率, 拍數]
-  const MELODY = [
-    [N.C5,1],[N.C5,1],[N.G5,1],[N.G5,1],[N.A5,1],[N.A5,1],[N.G5,2], [N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,1],[N.D5,1],[N.C5,2],
-    [N.G5,1],[N.G5,1],[N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,2], [N.G5,1],[N.G5,1],[N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,2],
-    [N.C5,1],[N.C5,1],[N.G5,1],[N.G5,1],[N.A5,1],[N.A5,1],[N.G5,2], [N.F5,1],[N.F5,1],[N.E5,1],[N.E5,1],[N.D5,1],[N.D5,1],[N.C5,2],
-  ];
-  // 低音：每兩拍一顆，跟著和弦走
-  const BASS = [
-    N.C3,N.C3, N.F3,N.C3, N.F3,N.C3, N.G3,N.C3,
-    N.C3,N.G3, N.C3,N.G3, N.C3,N.G3, N.C3,N.G3,
-    N.C3,N.C3, N.F3,N.C3, N.F3,N.C3, N.G3,N.C3,
-  ];
+  // 譜寫法："音名+八度:拍數"，"-" 是休止。例："G5:1 A5:.5"
+  const SEMI = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+  function noteFreq(name) {
+    const m = /^([A-G])(#?)(\d)$/.exec(name);
+    const semi = SEMI[m[1]] + (m[2] ? 1 : 0) + 12 * (Number(m[3]) - 4) - 9;
+    return 440 * Math.pow(2, semi / 12);
+  }
+  function parseScore(str) {
+    return str.trim().split(/\s+/).map(tok => {
+      const [n, b] = tok.split(':');
+      return [n === '-' ? 0 : noteFreq(n), Number(b)];
+    });
+  }
+  // 每首：bpm、主旋律、低音（每 bassEvery 拍一顆，跟和弦走，循環）。旋律皆為傳統童謠，無版權
+  const TRACKS = [
+    { name: 'Baby Shark', bpm: 120, bassEvery: 2, bass: 'G3 D3 G3 D3 G3 D3 G3 D3 C4 D3',
+      melody: `D5:.5 E5:.5 G5:1 G5:.5 G5:.5 G5:.5 G5:.5 G5:1
+               D5:.5 E5:.5 G5:1 G5:.5 G5:.5 G5:.5 G5:.5 G5:1
+               D5:.5 E5:.5 G5:1 G5:.5 G5:.5 G5:.5 G5:.5 G5:1
+               G5:1 G5:1 F#5:2 -:2` },
+    { name: 'Twinkle', bpm: 140, bassEvery: 2, bass: 'C3 C3 F3 C3 F3 C3 G3 C3 C3 G3 C3 G3 C3 G3 C3 G3 C3 C3 F3 C3 F3 C3 G3 C3',
+      melody: `C5:1 C5:1 G5:1 G5:1 A5:1 A5:1 G5:2 F5:1 F5:1 E5:1 E5:1 D5:1 D5:1 C5:2
+               G5:1 G5:1 F5:1 F5:1 E5:1 E5:1 D5:2 G5:1 G5:1 F5:1 F5:1 E5:1 E5:1 D5:2
+               C5:1 C5:1 G5:1 G5:1 A5:1 A5:1 G5:2 F5:1 F5:1 E5:1 E5:1 D5:1 D5:1 C5:2` },
+    { name: 'Mary', bpm: 140, bassEvery: 2, bass: 'C3 C3 G3 G3 C3 C3 G3 G3 C3 C3 G3 G3 G3 G3 C3 C3',
+      melody: `E5:1 D5:1 C5:1 D5:1 E5:1 E5:1 E5:2 D5:1 D5:1 D5:2 E5:1 G5:1 G5:2
+               E5:1 D5:1 C5:1 D5:1 E5:1 E5:1 E5:1 E5:1 D5:1 D5:1 E5:1 D5:1 C5:4` },
+    { name: 'Old MacDonald', bpm: 132, bassEvery: 2, bass: 'C3 C3 F3 C3 G3 G3 C3 C3',
+      melody: `C5:1 C5:1 C5:1 G4:1 A4:1 A4:1 G4:2 E5:1 E5:1 D5:1 D5:1 C5:2 -:2
+               C5:1 C5:1 C5:1 G4:1 A4:1 A4:1 G4:2 E5:1 E5:1 D5:1 D5:1 C5:2 -:2` },
+    { name: 'Row Your Boat', bpm: 150, bassEvery: 1.5, bass: 'C3 C3 C3 C3 C3 C3 G3 C3',
+      melody: `C5:1 C5:1 C5:.67 D5:.33 E5:1 E5:.67 D5:.33 E5:.67 F5:.33 G5:2
+               C6:.33 C6:.33 C6:.33 G5:.33 G5:.33 G5:.33 E5:.33 E5:.33 E5:.33 C5:.33 C5:.33 C5:.33
+               G5:.67 F5:.33 E5:.67 D5:.33 C5:2` },
+    { name: 'London Bridge', bpm: 132, bassEvery: 2, bass: 'C3 C3 C3 C3 G3 G3 C3 C3 C3 C3 C3 C3 G3 G3 C3 C3',
+      melody: `G5:1.5 A5:.5 G5:1 F5:1 E5:1 F5:1 G5:2 D5:1 E5:1 F5:2 E5:1 F5:1 G5:2
+               G5:1.5 A5:.5 G5:1 F5:1 E5:1 F5:1 G5:2 D5:2 G5:2 E5:1 C5:3` },
+  ].map(t => ({ ...t, melody: parseScore(t.melody), bass: t.bass.split(/\s+/).map(noteFreq), beat: 60 / t.bpm }));
+
   let musicOn = localStorage.getItem('babygame.music') !== 'off';   // 預設開
   let musicTimer = null, musicWanted = false;
-  let melodyIdx = 0, melodyTime = 0, bassIdx = 0, bassTime = 0;
+  let trackIdx = 0, track = TRACKS[0];
+  let melodyIdx = 0, melodyTime = 0, bassIdx = 0, bassTime = 0, trackEnd = 0;
 
+  function loadTrack(i, startAt) {
+    trackIdx = i; track = TRACKS[i];
+    melodyIdx = bassIdx = 0;
+    melodyTime = bassTime = startAt;
+    trackEnd = startAt + track.melody.reduce((sum, [, b]) => sum + b, 0) * track.beat;
+  }
   function scheduleMusic() {
     // 每 100ms 醒來一次，把接下來 0.35 秒內該響的音先排進 AudioContext，避免 setInterval 抖動
-    const horizon = audioCtx.currentTime + 0.35;
+    const now = audioCtx.currentTime, horizon = now + 0.35;
+    // 背景時 timer 被凍結、時鐘卻繼續走：落後超過 1 秒就從現在重新起算，不要一次塞一堆過期的音
+    if (melodyTime < now - 1) loadTrack(trackIdx, now + 0.1);
     while (melodyTime < horizon) {
-      const [f, beats] = MELODY[melodyIdx];
-      tone(f, beats * BEAT * 0.9, 'triangle', 0.5, melodyTime - audioCtx.currentTime, musicGain, 0.5);
-      melodyTime += beats * BEAT;
-      melodyIdx = (melodyIdx + 1) % MELODY.length;
+      if (melodyIdx >= track.melody.length) {   // 一首播完，空兩拍換下一首
+        loadTrack((trackIdx + 1) % TRACKS.length, melodyTime + track.beat * 2);
+        continue;
+      }
+      const [f, beats] = track.melody[melodyIdx++];
+      if (f) tone(f, beats * track.beat * 0.9, 'triangle', 0.5, melodyTime - now, musicGain, 0.5);
+      melodyTime += beats * track.beat;
     }
-    while (bassTime < horizon) {
-      tone(BASS[bassIdx], BEAT * 1.6, 'sine', 0.6, bassTime - audioCtx.currentTime, musicGain, 0.3);
-      bassTime += BEAT * 2;
-      bassIdx = (bassIdx + 1) % BASS.length;
+    while (bassTime < horizon && bassTime < trackEnd) {
+      tone(track.bass[bassIdx % track.bass.length], track.beat * 1.6, 'sine', 0.6, bassTime - now, musicGain, 0.3);
+      bassTime += track.beat * track.bassEvery;
+      bassIdx++;
     }
   }
   function startMusic() {
     musicWanted = true;
     if (!musicOn || !audioCtx || musicTimer) return;
-    melodyIdx = bassIdx = 0;
-    melodyTime = bassTime = audioCtx.currentTime + 0.1;
+    loadTrack(trackIdx, audioCtx.currentTime + 0.1);   // 從上次停的那首接著輪
     scheduleMusic();
     musicTimer = setInterval(scheduleMusic, 100);
   }
@@ -496,11 +551,12 @@
   function renderExplore(dir) {
     const [g, w, pic] = items[index];
     glyph.textContent = g;
-    word.textContent = mode === 'abc' ? `${g} is for ${w}` : `${w} ${NUMBER_NOUNS[index]}`;
+    word.textContent = w;   // 只秀單字，整句小孩看不懂；語音仍唸完整句
     document.body.style.background = COLORS[index % COLORS.length];
     // 字母：一張圖；數字：幾就放幾張，可逐個點來數數
     pics.innerHTML = '';
     const count = mode === 'abc' ? 1 : index + 1;
+    pics.classList.toggle('few', count >= 2 && count <= 5);
     pics.classList.toggle('many', count > 5);
     for (let i = 0; i < count; i++) {
       const s = document.createElement('span');
