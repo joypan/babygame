@@ -71,8 +71,12 @@
     background: #fff; color: #5d4037; box-shadow: 0 6px 0 rgba(0,0,0,0.15);
   }
   .round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+  .btn-music { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 16px; z-index: 5; }
   .btn-music.off { opacity: 0.5; }
-  #home .btn-music { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 16px; }
+  /* 首頁置中不靠 flex 對齊：每一列自己撐滿寬、內容置中，少一層 iOS 可能出包的地方 */
+  #home > * { width: 100%; text-align: center; }
+  #home .game-toggle { width: auto; margin: 0 auto; }
+  #debug { display: none; position: fixed; left: 8px; bottom: 8px; z-index: 99; font: 12px/1.4 monospace; background: rgba(0,0,0,0.7); color: #0f0; padding: 6px 8px; border-radius: 6px; white-space: pre; pointer-events: none; }
   .navbar { width: 100%; display: flex; justify-content: space-between; padding: 8px 20px 20px; }
   .arrow-btn {
     --size: min(20vw, 15vh, 110px);
@@ -158,10 +162,11 @@
 
 <div id="sky"></div>
 <div id="fx"></div>
+<button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
+<div id="debug"></div>
 
 <!-- ===== 首頁：選遊戲（探索/找找看）＋ 選內容（ABC/123） ===== -->
 <section id="home" class="screen active">
-  <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
   <h1>點一下開始玩 🎈</h1>
   <div class="game-toggle">
     <button data-game="explore" class="on">📖 探索</button>
@@ -177,7 +182,6 @@
 <section id="explore" class="screen play">
   <div class="topbar">
     <button class="round-btn btn-home" aria-label="回首頁">🏠</button>
-    <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
   </div>
   <div id="card">
     <div id="glyph">A</div>
@@ -196,7 +200,6 @@
 <section id="find" class="screen play">
   <div class="topbar">
     <button class="round-btn btn-home" aria-label="回首頁">🏠</button>
-    <button class="round-btn btn-music" aria-label="音樂開關">🎵</button>
   </div>
   <div id="quiz">
     <div id="prompt"><span class="hint">🔍</span><span id="prompt-text">Find A!</span></div>
@@ -680,6 +683,22 @@
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === ' ' || e.key === 'Enter') { ensureAudio(); sfx.tap(); bounce(glyph); sayCurrent(); }
   });
+
+  // ====== 量測模式：網址加 ?debug=1，左下角顯示版面數字 ======
+  if (/[?&]debug=1/.test(location.search)) {
+    const dbg = $('debug'); dbg.style.display = 'block';
+    const mid = r => (r.left + r.right) / 2;
+    const probe = () => {
+      const vw = innerWidth / 2;
+      const rows = [['home', $('home')], ['h1', document.querySelector('#home h1')], ['toggle', document.querySelector('.game-toggle')],
+                    ['modeRow', document.querySelector('.mode-row')], ['abc', $('btn-abc')], ['123', $('btn-123')]];
+      dbg.textContent = `inner ${innerWidth}x${innerHeight} vv ${Math.round(visualViewport.width)}x${Math.round(visualViewport.height)} off ${Math.round(visualViewport.offsetLeft)}\n`
+        + `scrollX ${scrollX} docW ${document.documentElement.scrollWidth} bodyW ${document.body.scrollWidth}\n`
+        + rows.map(([n, el]) => { const r = el.getBoundingClientRect(); return `${n}: L${Math.round(r.left)} W${Math.round(r.width)} mid${Math.round(mid(r) - vw)}`; }).join('\n')
+        + `\nUA ${navigator.userAgent.slice(0, 80)}`;
+    };
+    probe(); setInterval(probe, 1000);
+  }
 
   // 避免 iOS 雙擊放大
   let lastTouch = 0;
