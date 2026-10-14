@@ -1,12 +1,13 @@
 """產生遊戲語音 mp3（微軟 Edge TTS，en-US-AnaNeural 小女孩聲）。
 
-用法：python tools/gen_voice.py
+用法：python tools/gen_voice.py [只產的前綴，例如 find_]
+  不帶參數會整批重產；edge-tts 每次輸出位元組都不同，只改某類句子時請帶前綴，repo 才不會多一堆無意義變更。
 輸出：voice/*.mp3，檔名對應 index.html 的 speak(key)：
   abc_A   「A is for Apple.」         探索頁字母
   word_A  「Apple.」                  探索頁點小圖
   num_1   「one apple.」              探索頁數字
   count_1 「one.」                    探索頁數字點小圖數數
-  find_A / find_1  「A! Where is A?」  找找看題目（先單獨唸一次，避免 Find R 連音成 finder）
+  find_A / find_1  「B! Banana. B.」   找找看題目（字母→提示單字→字母；「Find R」會連音成 finder）
   yay_A   「Yay! A is for Apple.」    找找看答對（字母）
   yay_1   「Yay! one!」               找找看答對（數字）
 句子內容與 index.html 的 LETTERS / NUMBER_WORDS / NUMBER_NOUNS 對齊，改資料時兩邊一起改。
@@ -14,6 +15,7 @@
 """
 import asyncio
 import pathlib
+import sys
 
 import edge_tts
 
@@ -36,13 +38,13 @@ def phrases():
     for g, w in LETTERS:
         yield f"abc_{g}", f"{g} is for {w}."
         yield f"word_{g}", f"{w}."
-        yield f"find_{g}", f"{g}! Where is {g}?"
+        yield f"find_{g}", f"{g}! {w}. {g}."
         yield f"yay_{g}", f"Yay! {g} is for {w}."
     for i, w in enumerate(NUMBER_WORDS):
         n = i + 1
         yield f"num_{n}", f"{w} {NUMBER_NOUNS[i]}."
         yield f"count_{n}", f"{w}."
-        yield f"find_{n}", f"{w.capitalize()}! Where is {w}?"
+        yield f"find_{n}", f"{w.capitalize()}! {w.capitalize()} {NUMBER_NOUNS[i]}. {w.capitalize()}."
         yield f"yay_{n}", f"Yay! {w}!"
 
 
@@ -56,7 +58,8 @@ async def gen(sem, key, text):
 async def main():
     OUT.mkdir(exist_ok=True)
     sem = asyncio.Semaphore(6)   # 同時太多連線會被擋
-    await asyncio.gather(*(gen(sem, k, t) for k, t in phrases()))
+    prefix = sys.argv[1] if len(sys.argv) > 1 else ""
+    await asyncio.gather(*(gen(sem, k, t) for k, t in phrases() if k.startswith(prefix)))
 
 
 if __name__ == "__main__":

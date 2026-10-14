@@ -632,7 +632,11 @@
   const options = $('options'), score = $('score');
   let target = null, locked = false, streak = 0;
 
-  function sayPrompt() { speak(`find_${target[0]}`, `${target[1]}! Where is ${target[1]}?`); }   // 先單獨唸一次，避免 Find R 連音
+  // 字母→提示單字→字母（「Find R」會連音成 finder）；數字版：Seven! Seven flowers. Seven.
+  function sayPrompt() {
+    const [g, w] = target;
+    speak(`find_${g}`, mode === 'abc' ? `${g}! ${w}. ${g}.` : `${w}! ${w} ${NUMBER_NOUNS[items.indexOf(target)]}. ${w}.`);
+  }
   function newQuestion() {
     locked = false;
     let next;
