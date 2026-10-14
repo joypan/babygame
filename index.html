@@ -226,14 +226,17 @@
     }
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
   }
-  function tone(freq, duration, type, gainValue, when, dest) {
+  function tone(freq, duration, type, gainValue, when, dest, sustain) {
+    // sustain：0～1，音量撐住多久才開始衰減；音效用 0（點一下就散），音樂用較大值才聽得到旋律
     if (!audioCtx) return;
     const t0 = audioCtx.currentTime + (when || 0);
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.type = type || 'sine';
     osc.frequency.setValueAtTime(freq, t0);
-    gain.gain.setValueAtTime(gainValue || 0.2, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(gainValue || 0.2, t0 + 0.015);   // 短 attack 避免爆音
+    gain.gain.setValueAtTime(gainValue || 0.2, t0 + duration * (sustain || 0));
     gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
     osc.connect(gain).connect(dest || audioCtx.destination);
     osc.start(t0);
@@ -249,8 +252,8 @@
   };
 
   // ====== 背景音樂：小星星旋律用 Web Audio 排程循環播放，離線可用 ======
-  const MUSIC_VOL = 0.11;        // 平常音量
-  const MUSIC_DUCK = 0.03;       // 唸單字時的音量
+  const MUSIC_VOL = 0.45;        // 平常音量
+  const MUSIC_DUCK = 0.15;       // 唸單字時的音量
   const BEAT = 0.42;             // 每拍秒數（約 143 bpm，輕快）
   const N = { C5: 523.25, D5: 587.33, E5: 659.25, F5: 698.46, G5: 783.99, A5: 880, C3: 130.81, F3: 174.61, G3: 196 };
   // 主旋律 [頻率, 拍數]
@@ -274,12 +277,12 @@
     const horizon = audioCtx.currentTime + 0.35;
     while (melodyTime < horizon) {
       const [f, beats] = MELODY[melodyIdx];
-      tone(f, beats * BEAT * 0.9, 'triangle', 0.5, melodyTime - audioCtx.currentTime, musicGain);
+      tone(f, beats * BEAT * 0.9, 'triangle', 0.5, melodyTime - audioCtx.currentTime, musicGain, 0.5);
       melodyTime += beats * BEAT;
       melodyIdx = (melodyIdx + 1) % MELODY.length;
     }
     while (bassTime < horizon) {
-      tone(BASS[bassIdx], BEAT * 1.6, 'sine', 0.6, bassTime - audioCtx.currentTime, musicGain);
+      tone(BASS[bassIdx], BEAT * 1.6, 'sine', 0.6, bassTime - audioCtx.currentTime, musicGain, 0.3);
       bassTime += BEAT * 2;
       bassIdx = (bassIdx + 1) % BASS.length;
     }
@@ -296,9 +299,13 @@
     musicWanted = false;
     if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   }
+  let duckTimer = null;
   function duckMusic(on) {
     if (!musicGain) return;
     musicGain.gain.setTargetAtTime(on ? MUSIC_DUCK : MUSIC_VOL, audioCtx.currentTime, 0.08);
+    // 保險：有些平板的語音 onend 不會觸發，最多壓 4 秒就自動恢復
+    clearTimeout(duckTimer);
+    if (on) duckTimer = setTimeout(() => duckMusic(false), 4000);
   }
   function renderMusicButtons() {
     document.querySelectorAll('.btn-music').forEach(b => {
