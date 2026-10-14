@@ -11,10 +11,15 @@
   /* ====== 基本：平板觸控優先，禁止選取與縮放 ====== */
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
   html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Comic Sans MS", "Chalkboard SE", "Arial Rounded MT Bold", system-ui, sans-serif; }
-  body { background: #fff8e1; transition: background 0.4s ease; }
+  /* iOS 不理 body 的 overflow:hidden，滑動動畫/星星暫時超出畫面時整頁會被拖偏；固定住就不會捲 */
+  body { position: fixed; inset: 0; width: 100%; background: #fff8e1; transition: background 0.4s ease; overscroll-behavior: none; }
   button { font-family: inherit; }
 
-  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1; }
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1; overflow: hidden; }
+  /* 探索頁自己處理左右滑，不讓瀏覽器拿去捲頁 */
+  #explore { touch-action: none; }
+  /* 星星、彩紙放在自己的圖層裡裁掉，不會把頁面撐寬 */
+  #fx { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 9; }
   .screen.active { display: flex; }
 
   /* ====== 背景漂浮裝飾（雲、氣球、泡泡），從下往上慢慢飄 ====== */
@@ -137,10 +142,10 @@
   @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5) rotate(10deg); } 100% { transform: scale(1); } }
   .shake { animation: shake 0.4s ease; }
   @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-14px); } 40% { transform: translateX(14px); } 60% { transform: translateX(-10px); } 80% { transform: translateX(10px); } }
-  .star { position: absolute; font-size: 40px; pointer-events: none; z-index: 9; animation: fly 1s ease-out forwards; }
+  .star { position: absolute; font-size: 40px; animation: fly 1s ease-out forwards; }
   @keyframes fly { to { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; } }
   .confetti {
-    position: absolute; width: 14px; height: 14px; border-radius: 3px; pointer-events: none; z-index: 9;
+    position: absolute; width: 14px; height: 14px; border-radius: 3px;
     background: var(--c); animation: confetti 1.3s ease-in forwards;
   }
   @keyframes confetti {
@@ -152,6 +157,7 @@
 <body>
 
 <div id="sky"></div>
+<div id="fx"></div>
 
 <!-- ===== 首頁：選遊戲（探索/找找看）＋ 選內容（ABC/123） ===== -->
 <section id="home" class="screen active">
@@ -465,6 +471,7 @@
   }
 
   // ====== 小特效 ======
+  const fx = document.getElementById('fx');
   // 一次性動畫：加 class、播完自動拿掉，才不會蓋掉元素本身的閒置動畫（搖擺/漂浮）
   function animate(el, cls) {
     el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
@@ -481,7 +488,7 @@
       const ang = (Math.PI * 2 * i) / n;
       s.style.setProperty('--dx', Math.cos(ang) * 160 + 'px');
       s.style.setProperty('--dy', Math.sin(ang) * 160 + 'px');
-      document.body.appendChild(s);
+      fx.appendChild(s);
       setTimeout(() => s.remove(), 1000);
     }
   }
@@ -494,7 +501,7 @@
       c.style.setProperty('--c', COLORS[randInt(COLORS.length)]);
       c.style.setProperty('--dx', (Math.random() * 2 - 1) * 320 + 'px');
       c.style.setProperty('--dy', (Math.random() * -260 - 60 + Math.random() * 500) + 'px');
-      document.body.appendChild(c);
+      fx.appendChild(c);
       setTimeout(() => c.remove(), 1300);
     }
   }
