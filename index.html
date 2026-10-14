@@ -5,26 +5,110 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<title>探索 ABC 123</title>
-<link rel="stylesheet" href="common.css">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ABC 123 寶寶遊戲</title>
 <style>
-  /* 探索頁專用：大字卡，點整張卡就發音 */
-  #card { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 2vh; }
+  /* ====== 基本：平板觸控優先，禁止選取與縮放 ====== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: "Comic Sans MS", "Chalkboard SE", "Arial Rounded MT Bold", system-ui, sans-serif; }
+  body { background: #fff8e1; transition: background 0.4s ease; }
+  button { font-family: inherit; }
+
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; }
+  .screen.active { display: flex; }
+
+  /* ====== 首頁 ====== */
+  #home { gap: 3vh; padding: 16px; }
+  #home h1 { font-size: clamp(24px, 5vmin, 56px); color: #5d4037; margin: 0; text-shadow: 2px 2px 0 #fff; }
+
+  /* 遊戲切換（探索 / 找找看） */
+  .game-toggle { display: flex; background: #fff; border-radius: 40px; padding: 6px; box-shadow: 0 6px 0 rgba(0,0,0,0.12); }
+  .game-toggle button {
+    border: none; border-radius: 34px; padding: 10px 22px; cursor: pointer;
+    font-size: clamp(18px, 3.2vmin, 30px); font-weight: 700; color: #8d6e63; background: transparent;
+  }
+  .game-toggle button.on { background: #ffb74d; color: #fff; }
+
+  /* 兩顆超大模式按鈕：字型跟按鈕邊長連動，不會爆框 */
+  .mode-row { display: flex; gap: 5vmin; justify-content: center; }
+  .mode-btn {
+    --size: min(40vw, 42vh);
+    width: var(--size); height: var(--size); border: none; border-radius: 12%; cursor: pointer; overflow: hidden;
+    font-size: calc(var(--size) * 0.36); font-weight: 900; color: #fff; letter-spacing: -0.02em;
+    box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
+    transition: transform 0.1s;
+  }
+  .mode-btn:active { transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+  #btn-abc { background: linear-gradient(145deg, #ff7043, #e53935); }
+  #btn-123 { background: linear-gradient(145deg, #42a5f5, #1e88e5); }
+
+  /* ====== 遊戲頁共用 ====== */
+  .play { justify-content: space-between; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  .topbar { width: 100%; display: flex; justify-content: flex-start; padding: 12px 16px; }
+  .round-btn {
+    width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px;
+    background: #fff; color: #5d4037; box-shadow: 0 6px 0 rgba(0,0,0,0.15);
+  }
+  .round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+  .navbar { width: 100%; display: flex; justify-content: space-between; padding: 8px 20px 20px; }
+  .arrow-btn {
+    --size: min(20vw, 15vh, 110px);
+    width: var(--size); height: var(--size); border-radius: 28%; border: none; cursor: pointer;
+    font-size: calc(var(--size) * 0.55); font-weight: 900; color: #5d4037; background: #fff;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.15);
+  }
+  .arrow-btn:active { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0,0,0,0.15); }
+
+  /* ====== 探索頁 ====== */
+  #card { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; gap: 1.5vh; padding: 0 16px; }
   #glyph {
-    font-size: clamp(120px, 42vh, 420px); line-height: 1; font-weight: 900; color: #fff;
+    font-size: min(34vh, 40vw); line-height: 1; font-weight: 900; color: #fff;
     text-shadow: 0 8px 0 rgba(0,0,0,0.15), 0 16px 30px rgba(0,0,0,0.2);
   }
-  #pics { display: flex; flex-wrap: wrap; justify-content: center; gap: 1.5vw; max-width: 90vw; }
-  #pics span { font-size: clamp(48px, 9vh, 120px); line-height: 1; cursor: pointer; display: inline-block; }
-  #word { font-size: clamp(28px, 6vh, 72px); font-weight: 700; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.15); letter-spacing: 2px; }
+  #pics { display: flex; flex-wrap: wrap; justify-content: center; gap: 1vmin; max-width: 92vw; }
+  #pics span { font-size: min(9vh, 12vw); line-height: 1; cursor: pointer; display: inline-block; }
+  #pics.many span { font-size: min(6vh, 8vw); }   /* 數字 6–10 張圖時縮小，避免擠出版面 */
+  #word { font-size: min(6vh, 7vw); font-weight: 700; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,0.15); letter-spacing: 2px; text-align: center; }
+
+  /* ====== 找找看 ====== */
+  #quiz { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; padding: 0 16px; }
+  #prompt {
+    display: flex; align-items: center; gap: 3vmin; cursor: pointer;
+    font-size: min(8vh, 10vw); font-weight: 900; color: #fff; text-shadow: 0 4px 0 rgba(0,0,0,0.15);
+  }
+  #prompt .hint { font-size: min(9vh, 11vw); line-height: 1; }
+  #options { display: flex; gap: 3vmin; justify-content: center; width: 100%; }
+  .opt {
+    --size: min(27vw, 36vh);
+    width: var(--size); height: var(--size); border: none; border-radius: 14%; cursor: pointer; overflow: hidden;
+    font-size: calc(var(--size) * 0.6); font-weight: 900; color: #5d4037; background: #fff;
+    box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
+    transition: transform 0.1s, background 0.2s;
+  }
+  .opt:active { transform: translateY(8px); box-shadow: 0 4px 0 rgba(0,0,0,0.18); }
+  .opt.right { background: #ffee58; color: #e65100; }
+  #score { font-size: min(4vh, 5vw); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,0.15); letter-spacing: 4px; min-height: 1.4em; }
+
+  /* ====== 動畫 ====== */
+  .bounce { animation: bounce 0.5s ease; }
+  @keyframes bounce { 0% { transform: scale(1); } 30% { transform: scale(1.25) rotate(-5deg); } 60% { transform: scale(0.95) rotate(3deg); } 100% { transform: scale(1); } }
+  .pop { animation: pop 0.4s ease; }
+  @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.5); } 100% { transform: scale(1); } }
+  .shake { animation: shake 0.4s ease; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-14px); } 40% { transform: translateX(14px); } 60% { transform: translateX(-10px); } 80% { transform: translateX(10px); } }
+  .star { position: absolute; font-size: 40px; pointer-events: none; z-index: 9; animation: fly 1s ease-out forwards; }
+  @keyframes fly { to { transform: translate(var(--dx), var(--dy)) scale(0.3); opacity: 0; } }
 </style>
 </head>
 <body>
 
-<!-- ===== 首頁 ===== -->
+<!-- ===== 首頁：選遊戲（探索/找找看）＋ 選內容（ABC/123） ===== -->
 <section id="home" class="screen active">
-  <a class="switch-link" href="find.html">🔍 找找看</a>
   <h1>點一下開始玩 🎈</h1>
+  <div class="game-toggle">
+    <button data-game="explore" class="on">📖 探索</button>
+    <button data-game="find">🔍 找找看</button>
+  </div>
   <div class="mode-row">
     <button id="btn-abc" class="mode-btn" data-mode="abc">ABC</button>
     <button id="btn-123" class="mode-btn" data-mode="num">123</button>
@@ -32,10 +116,8 @@
 </section>
 
 <!-- ===== 探索頁 ===== -->
-<section id="play" class="screen">
-  <div class="topbar">
-    <button id="btn-home" class="round-btn" aria-label="回首頁">🏠</button>
-  </div>
+<section id="explore" class="screen play">
+  <div class="topbar"><button class="round-btn btn-home" aria-label="回首頁">🏠</button></div>
   <div id="card">
     <div id="glyph">A</div>
     <div id="pics"></div>
@@ -47,109 +129,269 @@
   </div>
 </section>
 
-<script src="common.js"></script>
+<!-- ===== 找找看頁 ===== -->
+<section id="find" class="screen play">
+  <div class="topbar"><button class="round-btn btn-home" aria-label="回首頁">🏠</button></div>
+  <div id="quiz">
+    <div id="prompt"><span class="hint">🔍</span><span id="prompt-text">Find A!</span></div>
+    <div id="options"></div>
+    <div id="score"></div>
+  </div>
+  <div class="navbar">
+    <button id="btn-repeat" class="arrow-btn" aria-label="再聽一次">🔊</button>
+    <button id="btn-skip" class="arrow-btn" aria-label="下一題">▶</button>
+  </div>
+</section>
+
 <script>
 (function () {
   'use strict';
-  const { LETTERS, NUMBERS, NUMBER_WORDS, NUMBER_NOUNS, COLORS, ensureAudio, sfx, speak, stopSpeak, bounce, spawnStars } = window.Baby;
 
-  let mode = 'abc';   // 'abc' | 'num'
-  let index = 0;
+  // ====== 內容資料 ======
+  const LETTERS = [
+    ['A', 'Apple', '🍎'], ['B', 'Banana', '🍌'], ['C', 'Cat', '🐱'], ['D', 'Dog', '🐶'],
+    ['E', 'Elephant', '🐘'], ['F', 'Fish', '🐟'], ['G', 'Grapes', '🍇'], ['H', 'Hat', '🎩'],
+    ['I', 'Ice cream', '🍦'], ['J', 'Juice', '🧃'], ['K', 'Kite', '🪁'], ['L', 'Lion', '🦁'],
+    ['M', 'Monkey', '🐵'], ['N', 'Nose', '👃'], ['O', 'Orange', '🍊'], ['P', 'Pig', '🐷'],
+    ['Q', 'Queen', '👸'], ['R', 'Rabbit', '🐰'], ['S', 'Sun', '☀️'], ['T', 'Tiger', '🐯'],
+    ['U', 'Umbrella', '☂️'], ['V', 'Violin', '🎻'], ['W', 'Watermelon', '🍉'], ['X', 'Xylophone', '🎶'],
+    ['Y', 'Yo-yo', '🪀'], ['Z', 'Zebra', '🦓'],
+  ];
+  const NUMBER_WORDS = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+  const NUMBER_NOUNS = ['apple', 'chicks', 'balloons', 'stars', 'strawberries', 'fish', 'flowers', 'cookies', 'frogs', 'cars'];
+  const NUMBER_PICS  = ['🍎', '🐥', '🎈', '⭐', '🍓', '🐟', '🌸', '🍪', '🐸', '🚗'];
+  const NUMBERS = NUMBER_WORDS.map((w, i) => [String(i + 1), w, NUMBER_PICS[i]]);   // 統一 [字, 單字, 圖]
+  const COLORS = ['#ef5350', '#ff7043', '#ffa726', '#66bb6a', '#26a69a', '#29b6f6', '#5c6bc0', '#ab47bc', '#ec407a', '#8d6e63'];
+
+  // ====== 音效：Web Audio 合成，不需音檔 ======
+  let audioCtx = null;
+  function ensureAudio() {
+    // 行動瀏覽器要有使用者手勢後才允許建立/恢復 AudioContext，每次點擊都呼叫一次
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+  function tone(freq, duration, type, gainValue, when) {
+    if (!audioCtx) return;
+    const t0 = audioCtx.currentTime + (when || 0);
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(gainValue || 0.2, t0);
+    gain.gain.exponentialRampToValueAtTime(0.001, t0 + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration);
+  }
+  const sfx = {
+    tap()   { tone(880, 0.12, 'triangle', 0.25); },
+    pop()   { tone(1200, 0.08, 'square', 0.12); },
+    swipe() { tone(520, 0.1, 'sine', 0.2); tone(780, 0.12, 'sine', 0.2, 0.08); },
+    start() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.2, i * 0.1)); },
+    yay()   { [659, 784, 988, 1319, 1568].forEach((f, i) => tone(f, 0.3, 'triangle', 0.22, i * 0.09)); },
+    nope()  { tone(300, 0.18, 'sine', 0.15); },
+  };
+
+  // ====== 語音：Web Speech API，英文 ======
+  let voice = null;
+  function pickVoice() {
+    if (!('speechSynthesis' in window)) return;
+    const voices = speechSynthesis.getVoices();
+    if (!voices.length) return;
+    voice = voices.find(v => /^en[-_]US/i.test(v.lang)) || voices.find(v => /^en/i.test(v.lang)) || null;
+  }
+  if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+  function speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();   // 連點時打斷上一句，不排隊
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    if (voice) u.voice = voice;
+    u.rate = 0.85;   // 稍慢，小小孩聽得清楚
+    u.pitch = 1.1;
+    speechSynthesis.speak(u);
+  }
+  function stopSpeak() { if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+
+  // ====== 小特效 ======
+  function bounce(el) { el.classList.remove('bounce'); void el.offsetWidth; el.classList.add('bounce'); }
+  function spawnStars(x, y, n) {
+    n = n || 6;
+    for (let i = 0; i < n; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      s.textContent = ['⭐', '✨', '🌟'][i % 3];
+      s.style.left = x + 'px'; s.style.top = y + 'px';
+      const ang = (Math.PI * 2 * i) / n;
+      s.style.setProperty('--dx', Math.cos(ang) * 160 + 'px');
+      s.style.setProperty('--dy', Math.sin(ang) * 160 + 'px');
+      document.body.appendChild(s);
+      setTimeout(() => s.remove(), 1000);
+    }
+  }
+  function randInt(n) { return Math.floor(Math.random() * n); }
+  function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+
+  // ====== 共同狀態與畫面切換 ======
+  const $ = (id) => document.getElementById(id);
+  let game = 'explore';   // 'explore' | 'find'
+  let mode = 'abc';       // 'abc' | 'num'
   let items = LETTERS;
 
-  const $ = (id) => document.getElementById(id);
-  const home = $('home'), play = $('play');
-  const glyph = $('glyph'), pics = $('pics'), word = $('word'), card = $('card');
-
-  function render() {
-    const [g, w, pic] = items[index];
-    glyph.textContent = g;
-    word.textContent = mode === 'abc' ? `${g} is for ${w}` : `${w} ${NUMBER_NOUNS[index]}`;
-    document.body.style.background = COLORS[index % COLORS.length];
-
-    // 字母：一張圖；數字：幾就放幾張，可以逐個點來數數
-    pics.innerHTML = '';
-    const count = mode === 'abc' ? 1 : index + 1;
-    for (let i = 0; i < count; i++) {
-      const s = document.createElement('span');
-      s.textContent = pic;
-      s.dataset.n = i + 1;
-      pics.appendChild(s);
-    }
-    bounce(glyph);
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
   }
-
-  function sayCurrent() {
-    const [g, w] = items[index];
-    if (mode === 'abc') speak(`${g}. ${g} is for ${w}.`);
-    else speak(`${w}. ${w} ${NUMBER_NOUNS[index]}.`);
-  }
-
-  function go(delta) {
-    index = (index + delta + items.length) % items.length;
-    sfx.swipe();
-    render();
-    sayCurrent();
+  function goHome() {
+    stopSpeak();
+    show('home');
+    document.body.style.background = '#fff8e1';
   }
   function enter(m) {
     ensureAudio();
     mode = m;
     items = m === 'abc' ? LETTERS : NUMBERS;
-    index = 0;
-    home.classList.remove('active');
-    play.classList.add('active');
     sfx.start();
-    render();
+    if (game === 'explore') enterExplore(); else enterFind();
+  }
+
+  document.querySelectorAll('.game-toggle button').forEach(b => b.addEventListener('click', () => {
+    ensureAudio(); sfx.pop();
+    game = b.dataset.game;
+    document.querySelectorAll('.game-toggle button').forEach(x => x.classList.toggle('on', x === b));
+  }));
+  document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => enter(b.dataset.mode)));
+  document.querySelectorAll('.btn-home').forEach(b => b.addEventListener('click', goHome));
+
+  // ====== 探索 ======
+  const explore = $('explore'), glyph = $('glyph'), pics = $('pics'), word = $('word'), card = $('card');
+  let index = 0;
+
+  function renderExplore() {
+    const [g, w, pic] = items[index];
+    glyph.textContent = g;
+    word.textContent = mode === 'abc' ? `${g} is for ${w}` : `${w} ${NUMBER_NOUNS[index]}`;
+    document.body.style.background = COLORS[index % COLORS.length];
+    // 字母：一張圖；數字：幾就放幾張，可逐個點來數數
+    pics.innerHTML = '';
+    const count = mode === 'abc' ? 1 : index + 1;
+    pics.classList.toggle('many', count > 5);
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('span');
+      s.textContent = pic; s.dataset.n = i + 1;
+      pics.appendChild(s);
+    }
+    bounce(glyph);
+  }
+  function sayCurrent() {
+    const [g, w] = items[index];
+    if (mode === 'abc') speak(`${g}. ${g} is for ${w}.`);
+    else speak(`${w}. ${w} ${NUMBER_NOUNS[index]}.`);
+  }
+  function go(delta) {
+    index = (index + delta + items.length) % items.length;
+    sfx.swipe(); renderExplore(); sayCurrent();
+  }
+  function enterExplore() {
+    index = 0;
+    show('explore');
+    renderExplore();
     setTimeout(sayCurrent, 350);
   }
-  function goHome() {
-    stopSpeak();
-    play.classList.remove('active');
-    home.classList.add('active');
-    document.body.style.background = '#fff8e1';
-  }
-
-  document.querySelectorAll('.mode-btn').forEach(b => b.addEventListener('click', () => enter(b.dataset.mode)));
-  $('btn-home').addEventListener('click', goHome);
   $('btn-prev').addEventListener('click', () => go(-1));
   $('btn-next').addEventListener('click', () => go(1));
-
-  // 點字卡：發音 + 星星；數字模式點小圖：唸出第幾個（數數）
   card.addEventListener('click', (e) => {
     ensureAudio();
-    const target = e.target;
-    if (target.parentElement === pics && mode === 'num') {
+    const t = e.target;
+    if (t.parentElement === pics && mode === 'num') {   // 點小圖：唸第幾個
       sfx.pop();
-      target.classList.remove('pop'); void target.offsetWidth; target.classList.add('pop');
-      speak(NUMBER_WORDS[Number(target.dataset.n) - 1]);
+      t.classList.remove('pop'); void t.offsetWidth; t.classList.add('pop');
+      speak(NUMBER_WORDS[Number(t.dataset.n) - 1]);
       return;
     }
-    sfx.tap();
-    bounce(glyph);
-    spawnStars(e.clientX, e.clientY);
-    sayCurrent();
+    sfx.tap(); bounce(glyph); spawnStars(e.clientX, e.clientY); sayCurrent();
   });
-
-  // 左右滑動換頁（平板）
+  // 左右滑動換頁
   let touchX = null, touchY = null;
-  play.addEventListener('touchstart', (e) => {
-    touchX = e.touches[0].clientX; touchY = e.touches[0].clientY;
-  }, { passive: true });
-  play.addEventListener('touchend', (e) => {
+  explore.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
+  explore.addEventListener('touchend', (e) => {
     if (touchX === null) return;
-    const dx = e.changedTouches[0].clientX - touchX;
-    const dy = e.changedTouches[0].clientY - touchY;
+    const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
     touchX = touchY = null;
     if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
   }, { passive: true });
 
-  // 鍵盤（電腦上測試用）
+  // ====== 找找看 ======
+  const OPTION_COUNT = 3;   // 三選一，2–4 歲剛好
+  const prompt = $('prompt'), promptText = $('prompt-text'), hint = prompt.querySelector('.hint');
+  const options = $('options'), score = $('score');
+  let target = null, locked = false, streak = 0;
+
+  function sayPrompt() { speak(`Find ${target[0]}.`); }
+  function newQuestion() {
+    locked = false;
+    let next;
+    do { next = items[randInt(items.length)]; } while (target && next[0] === target[0]);   // 不跟上一題重複
+    target = next;
+    const pool = shuffle(items.filter(it => it[0] !== target[0])).slice(0, OPTION_COUNT - 1);
+    const choices = shuffle([target, ...pool]);
+
+    document.body.style.background = COLORS[randInt(COLORS.length)];
+    promptText.textContent = `Find ${target[0]}!`;
+    hint.textContent = target[2];
+    bounce(prompt);
+    options.innerHTML = '';
+    choices.forEach(([g]) => {
+      const b = document.createElement('button');
+      b.className = 'opt'; b.textContent = g; b.dataset.g = g;
+      options.appendChild(b);
+    });
+    setTimeout(sayPrompt, 300);
+  }
+  function onPick(btn, x, y) {
+    if (locked) return;
+    ensureAudio();
+    if (btn.dataset.g === target[0]) {
+      // 答對：鎖住、放星星、歡呼，再出下一題
+      locked = true; streak++;
+      btn.classList.add('right'); bounce(btn); spawnStars(x, y, 10); sfx.yay();
+      speak(mode === 'abc' ? `Yay! ${target[0]}! ${target[0]} is for ${target[1]}.` : `Yay! ${target[1]}!`);
+      score.textContent = '⭐'.repeat(Math.min(streak, 10));
+      setTimeout(newQuestion, mode === 'abc' ? 2600 : 1800);
+    } else {
+      // 答錯：只搖一下、再唸一次題目，不給負面提示
+      btn.classList.remove('shake'); void btn.offsetWidth; btn.classList.add('shake');
+      sfx.nope();
+      setTimeout(sayPrompt, 250);
+    }
+  }
+  function enterFind() {
+    target = null; streak = 0; score.textContent = '';
+    show('find');
+    newQuestion();
+  }
+  $('btn-repeat').addEventListener('click', () => { ensureAudio(); sfx.tap(); bounce(prompt); sayPrompt(); });
+  $('btn-skip').addEventListener('click', () => { ensureAudio(); sfx.swipe(); newQuestion(); });
+  prompt.addEventListener('click', () => { ensureAudio(); sfx.tap(); bounce(prompt); sayPrompt(); });
+  options.addEventListener('click', (e) => { const b = e.target.closest('.opt'); if (b) onPick(b, e.clientX, e.clientY); });
+
+  // ====== 鍵盤（電腦測試用）======
   document.addEventListener('keydown', (e) => {
-    if (!play.classList.contains('active')) return;
+    if (!explore.classList.contains('active')) return;
     if (e.key === 'ArrowRight') go(1);
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === ' ' || e.key === 'Enter') { ensureAudio(); sfx.tap(); bounce(glyph); sayCurrent(); }
   });
+
+  // 避免 iOS 雙擊放大
+  let lastTouch = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTouch < 300) e.preventDefault();
+    lastTouch = now;
+  }, { passive: false });
 })();
 </script>
 </body>
