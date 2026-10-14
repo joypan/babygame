@@ -6,7 +6,7 @@
   word_A  「Apple.」                  探索頁點小圖
   num_1   「one apple.」              探索頁數字
   count_1 「one.」                    探索頁數字點小圖數數
-  find_A / find_1  「Find A.」        找找看題目
+  find_A / find_1  「A! Where is A?」  找找看題目（先單獨唸一次，避免 Find R 連音成 finder）
   yay_A   「Yay! A is for Apple.」    找找看答對（字母）
   yay_1   「Yay! one!」               找找看答對（數字）
 句子內容與 index.html 的 LETTERS / NUMBER_WORDS / NUMBER_NOUNS 對齊，改資料時兩邊一起改。
@@ -36,13 +36,13 @@ def phrases():
     for g, w in LETTERS:
         yield f"abc_{g}", f"{g} is for {w}."
         yield f"word_{g}", f"{w}."
-        yield f"find_{g}", f"Find {g}."
+        yield f"find_{g}", f"{g}! Where is {g}?"
         yield f"yay_{g}", f"Yay! {g} is for {w}."
     for i, w in enumerate(NUMBER_WORDS):
         n = i + 1
         yield f"num_{n}", f"{w} {NUMBER_NOUNS[i]}."
         yield f"count_{n}", f"{w}."
-        yield f"find_{n}", f"Find {n}."
+        yield f"find_{n}", f"{w.capitalize()}! Where is {w}?"
         yield f"yay_{n}", f"Yay! {w}!"
 
 

@@ -632,7 +632,7 @@
   const options = $('options'), score = $('score');
   let target = null, locked = false, streak = 0;
 
-  function sayPrompt() { speak(`find_${target[0]}`, `Find ${target[0]}.`); }
+  function sayPrompt() { speak(`find_${target[0]}`, `${target[1]}! Where is ${target[1]}?`); }   // 先單獨唸一次，避免 Find R 連音
   function newQuestion() {
     locked = false;
     let next;
