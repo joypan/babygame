@@ -70,6 +70,7 @@
   .round-btn {
     width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer; font-size: 30px;
     background: #fff; color: #5d4037; box-shadow: 0 6px 0 rgba(0,0,0,0.15);
+    padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1;   /* iOS 按鈕預設有 padding，emoji 會擠到右邊 */
   }
   .round-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
   .btn-music { position: fixed; top: calc(12px + env(safe-area-inset-top)); right: 16px; z-index: 5; }
@@ -84,6 +85,7 @@
     width: var(--size); height: var(--size); border-radius: 28%; border: none; cursor: pointer;
     font-size: calc(var(--size) * 0.55); font-weight: 900; color: #5d4037; background: #fff;
     box-shadow: 0 8px 0 rgba(0,0,0,0.15);
+    padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1;
   }
   .arrow-btn:active { transform: translateY(5px); box-shadow: 0 3px 0 rgba(0,0,0,0.15); }
 
@@ -130,6 +132,7 @@
     width: var(--size); height: var(--size); border: none; border-radius: 14%; cursor: pointer; overflow: hidden;
     font-size: calc(var(--size) * 0.6); font-weight: 900; color: #5d4037; background: #fff;
     box-shadow: 0 12px 0 rgba(0,0,0,0.18), 0 20px 40px rgba(0,0,0,0.15);
+    padding: 0; display: flex; align-items: center; justify-content: center; line-height: 1;
     transition: transform 0.1s, background 0.2s, opacity 0.3s;
     animation: popin 0.4s cubic-bezier(.2,1.6,.4,1) backwards; animation-delay: calc(var(--i, 0) * 0.08s);
   }
